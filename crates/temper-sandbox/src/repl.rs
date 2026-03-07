@@ -7,7 +7,7 @@
 use anyhow::Result;
 use monty::MontyObject;
 
-use crate::dispatch::dispatch_temper_method;
+use crate::dispatch::{DispatchContext, dispatch_temper_method};
 use crate::runner::run_sandbox;
 
 /// Configuration for a REPL session.
@@ -43,18 +43,15 @@ pub async fn run_repl(config: &ReplConfig, code: &str) -> Result<String> {
                 } else {
                     &args[1..]
                 };
-                dispatch_temper_method(
-                    &http,
-                    &base_url,
-                    "default",
-                    principal_id.as_deref(),
-                    &function_name,
-                    args,
-                    &kwargs,
-                    None,
-                    None,
-                )
-                .await
+                let ctx = DispatchContext {
+                    http: &http,
+                    base_url: &base_url,
+                    tenant: "default",
+                    principal_id: principal_id.as_deref(),
+                    entity_set_resolver: None,
+                    binary_path: None,
+                };
+                dispatch_temper_method(&ctx, &function_name, args, &kwargs).await
             }
         },
     )

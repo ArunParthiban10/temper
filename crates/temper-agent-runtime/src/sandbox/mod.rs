@@ -114,16 +114,16 @@ async fn dispatch_method(
             let pid = {
                 principal_id.lock().unwrap().clone() // ci-ok: infallible lock
             };
-            temper_sandbox::dispatch::dispatch_temper_method(
+            let ctx = temper_sandbox::dispatch::DispatchContext {
                 http,
-                server_url,
+                base_url: server_url,
                 tenant,
-                pid.as_deref(),
-                function_name,
-                args,
-                kwargs,
-                None, // No entity set resolver for agent (uses entity type directly)
-                None, // No binary path for agent
+                principal_id: pid.as_deref(),
+                entity_set_resolver: None,
+                binary_path: None,
+            };
+            temper_sandbox::dispatch::dispatch_temper_method(
+                &ctx, function_name, args, kwargs,
             )
             .await
         }

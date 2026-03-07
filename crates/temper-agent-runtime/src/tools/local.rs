@@ -393,4 +393,83 @@ mod tests {
         assert_eq!(mapping.action, "entity_action");
         assert_eq!(mapping.resource_id, "Tasks");
     }
+
+    #[test]
+    fn test_cedar_file_write() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("file_write", &json!({"path": "/tmp/out.txt"}));
+        assert_eq!(mapping.resource_type, "FileSystem");
+        assert_eq!(mapping.action, "write");
+        assert_eq!(mapping.resource_id, "/tmp/out.txt");
+    }
+
+    #[test]
+    fn test_cedar_file_list() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("file_list", &json!({"path": "/home"}));
+        assert_eq!(mapping.resource_type, "FileSystem");
+        assert_eq!(mapping.action, "list");
+        assert_eq!(mapping.resource_id, "/home");
+    }
+
+    #[test]
+    fn test_cedar_shell_execute() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("shell_execute", &json!({"command": "ls -la"}));
+        assert_eq!(mapping.resource_type, "Shell");
+        assert_eq!(mapping.action, "execute");
+        assert_eq!(mapping.resource_id, "ls -la");
+    }
+
+    #[test]
+    fn test_cedar_unknown_tool() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("nonexistent_tool", &json!({}));
+        assert_eq!(mapping.resource_type, "Unknown");
+        assert_eq!(mapping.action, "nonexistent_tool");
+        assert_eq!(mapping.resource_id, "unknown");
+    }
+
+    #[test]
+    fn test_cedar_entity_list() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("entity_list", &json!({"entity_type": "Agents"}));
+        assert_eq!(mapping.resource_type, "Entity");
+        assert_eq!(mapping.action, "entity_list");
+        assert_eq!(mapping.resource_id, "Agents");
+    }
+
+    #[test]
+    fn test_cedar_entity_get() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        let mapping = registry.to_cedar("entity_get", &json!({"entity_type": "Plans"}));
+        assert_eq!(mapping.resource_type, "Entity");
+        assert_eq!(mapping.action, "entity_get");
+        assert_eq!(mapping.resource_id, "Plans");
+    }
+
+    #[test]
+    fn test_tool_schemas_have_required_fields() {
+        let client = TemperClient::new("http://localhost:4200", "default");
+        let registry = LocalToolRegistry::new(client);
+        for tool in registry.list_tools() {
+            assert!(!tool.name.is_empty(), "tool name must not be empty");
+            assert!(
+                !tool.description.is_empty(),
+                "tool '{}' must have description",
+                tool.name
+            );
+            assert!(
+                tool.input_schema.get("type").is_some(),
+                "tool '{}' schema must have type",
+                tool.name
+            );
+        }
+    }
 }

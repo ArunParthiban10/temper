@@ -18,6 +18,7 @@ mod lint;
 pub mod metadata;
 pub mod parser;
 mod toml_parser;
+pub mod translate;
 mod types;
 
 pub use assert_parser::{AssertCompareOp, ParsedAssert, parse_assert_expr};
@@ -27,4 +28,5 @@ pub use initial::{
 pub use lint::{LintFinding, LintSeverity, lint_automaton};
 pub use metadata::SpecMetadata;
 pub use parser::{parse_automaton, to_state_machine};
+pub use translate::{ResolvedAction, ResolvedEffect, ResolvedGuard, translate_actions};
 pub use types::*;

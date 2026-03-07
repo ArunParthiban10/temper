@@ -24,28 +24,9 @@ import {
   groupByDate,
 } from "@/lib/utils";
 
-const ALL_TENANTS = "__all__";
+import StatCard from "@/components/StatCard";
 
-function StatCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  color?: string;
-}) {
-  return (
-    <div className="glass rounded p-3.5">
-      <div className="text-[12px] text-zinc-600">{label}</div>
-      <div
-        className={`text-4xl font-bold font-mono mt-0.5 ${color ?? "text-zinc-100"}`}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
+const ALL_TENANTS = "__all__";
 
 const SCOPE_LABELS: Record<PolicyScope, string> = {
   narrow: "Narrow -- exact resource only",
@@ -303,7 +284,7 @@ export default function DecisionsPage() {
   const [tenant, setTenant] = useState<string>(ALL_TENANTS);
   const [tenants, setTenants] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [acting, setActing] = useState(false);
+  const [actingIds, setActingIds] = useState<Set<string>>(new Set());
   const [liveDecisions, setLiveDecisions] = useState<PendingDecision[]>([]);
 
   const loadInitial = useCallback(async () => {
@@ -364,14 +345,18 @@ export default function DecisionsPage() {
 
   const handleApprove = useCallback(
     async (id: string, scope: PolicyScope, decisionTenant: string) => {
-      setActing(true);
+      setActingIds((prev) => new Set(prev).add(id));
       try {
         await approveDecision(decisionTenant, id, scope);
         await decisionsPoll.refresh();
       } catch (err) {
         console.error("Failed to approve decision:", err);
       } finally {
-        setActing(false);
+        setActingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     },
     [decisionsPoll],
@@ -379,14 +364,18 @@ export default function DecisionsPage() {
 
   const handleDeny = useCallback(
     async (id: string, decisionTenant: string) => {
-      setActing(true);
+      setActingIds((prev) => new Set(prev).add(id));
       try {
         await denyDecision(decisionTenant, id);
         await decisionsPoll.refresh();
       } catch (err) {
         console.error("Failed to deny decision:", err);
       } finally {
-        setActing(false);
+        setActingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     },
     [decisionsPoll],
@@ -535,7 +524,7 @@ export default function DecisionsPage() {
                 decision={d}
                 onApprove={handleApprove}
                 onDeny={handleDeny}
-                acting={acting}
+                acting={actingIds.has(d.id)}
                 showTenant={showTenantBadge}
               />
             ))}

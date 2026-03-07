@@ -8,29 +8,8 @@ import type { TrajectoryResponse, EntityStateChange, EntitySummary } from "@/lib
 import ErrorDisplay from "@/components/ErrorDisplay";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailPanel from "@/components/EntityDetailPanel";
-
-function StatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div className="glass rounded p-3.5">
-      <div className="text-[12px] text-zinc-600">{label}</div>
-      <div className={`text-4xl font-bold font-mono mt-0.5 ${color ?? "text-zinc-100"}`}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function rateColor(rate: number): string {
-  if (rate >= 80) return "text-teal-400";
-  if (rate >= 50) return "text-amber-400";
-  return "text-pink-400";
-}
-
-function rateBgColor(rate: number): string {
-  if (rate >= 80) return "bg-teal-400";
-  if (rate >= 50) return "bg-amber-400";
-  return "bg-pink-400";
-}
+import StatCard from "@/components/StatCard";
+import { rateColor, rateBgColor } from "@/lib/utils";
 
 export default function ActivityPage() {
   const [initialLoading, setInitialLoading] = useState(true);

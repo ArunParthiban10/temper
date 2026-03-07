@@ -176,12 +176,6 @@ export default function Dashboard() {
   });
   const verificationStatus = verifyPoll.data;
 
-  // Check if any entity is still pending/running (to show progress panel)
-  const buildInProgress = useMemo(() => {
-    if (!verificationStatus) return false;
-    return verificationStatus.pending > 0 || verificationStatus.running > 0;
-  }, [verificationStatus]);
-
   // SSE subscriptions for real-time reactivity
   useEffect(() => {
     if (initialLoading || initialError) return;

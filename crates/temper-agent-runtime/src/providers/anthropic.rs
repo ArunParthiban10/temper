@@ -293,4 +293,66 @@ mod tests {
         let body = provider.build_body("system", &[], &[], true);
         assert_eq!(body["stream"], true);
     }
+
+    #[test]
+    fn with_key_stores_fields() {
+        let provider = AnthropicProvider::with_key("sk-abc", "claude-3");
+        assert_eq!(provider.api_key, "sk-abc");
+        assert_eq!(provider.model, "claude-3");
+    }
+
+    #[test]
+    fn extract_deltas_text_delta() {
+        let data = r#"{"delta":{"type":"text_delta","text":"hello"}}"#;
+        let (text, json) = extract_deltas(data);
+        assert_eq!(text, Some("hello".to_string()));
+        assert!(json.is_none());
+    }
+
+    #[test]
+    fn extract_deltas_input_json_delta() {
+        let data = r#"{"delta":{"type":"input_json_delta","partial_json":"{\"key\":"}}"#;
+        let (text, json) = extract_deltas(data);
+        assert!(text.is_none());
+        assert_eq!(json, Some("{\"key\":".to_string()));
+    }
+
+    #[test]
+    fn extract_deltas_unknown_type() {
+        let data = r#"{"delta":{"type":"ping"}}"#;
+        let (text, json) = extract_deltas(data);
+        assert!(text.is_none());
+        assert!(json.is_none());
+    }
+
+    #[test]
+    fn extract_deltas_no_delta_field() {
+        let data = r#"{"other":"data"}"#;
+        let (text, json) = extract_deltas(data);
+        assert!(text.is_none());
+        assert!(json.is_none());
+    }
+
+    #[test]
+    fn extract_deltas_invalid_json() {
+        let (text, json) = extract_deltas("not json");
+        assert!(text.is_none());
+        assert!(json.is_none());
+    }
+
+    #[test]
+    fn build_body_includes_messages_and_tools() {
+        let provider = AnthropicProvider::with_key("k", "m");
+        let msgs = vec![Message {
+            role: "user".to_string(),
+            content: vec![ContentBlock::Text {
+                text: "hi".to_string(),
+            }],
+        }];
+        let tools = vec![serde_json::json!({"name": "tool1"})];
+        let body = provider.build_body("sys", &msgs, &tools, false);
+        assert_eq!(body["messages"][0]["role"], "user");
+        assert_eq!(body["tools"][0]["name"], "tool1");
+        assert_eq!(body["max_tokens"], MAX_TOKENS);
+    }
 }

@@ -315,3 +315,97 @@ impl LlmProvider for CodexProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a CodexProvider without loading credentials from disk.
+    fn test_provider() -> CodexProvider {
+        CodexProvider {
+            client: reqwest::Client::new(),
+            model: "codex-mini".to_string(),
+            credentials: Mutex::new(CodexCredentials {
+                access_token: "test-token".to_string(),
+                refresh_token: "test-refresh".to_string(),
+                account_id: "acct-123".to_string(),
+                expires_at: 0,
+            }),
+        }
+    }
+
+    #[test]
+    fn build_body_basic_structure() {
+        let provider = test_provider();
+        let body = provider.build_body("system prompt", &[], &[]);
+        assert_eq!(body["model"], "codex-mini");
+        assert_eq!(body["instructions"], "system prompt");
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["store"], false);
+        assert!(body.get("tools").is_none(), "no tools when empty");
+    }
+
+    #[test]
+    fn build_body_with_tools() {
+        let provider = test_provider();
+        let tools = vec![serde_json::json!({
+            "name": "read_file",
+            "description": "Read file",
+            "input_schema": { "type": "object" }
+        })];
+        let body = provider.build_body("sys", &[], &tools);
+        assert!(body.get("tools").is_some());
+        assert_eq!(body["tools"][0]["name"], "read_file");
+    }
+
+    #[test]
+    fn build_body_with_messages() {
+        let provider = test_provider();
+        let msgs = vec![Message {
+            role: "user".to_string(),
+            content: vec![ContentBlock::Text {
+                text: "hello".to_string(),
+            }],
+        }];
+        let body = provider.build_body("sys", &msgs, &[]);
+        let input = body["input"].as_array().expect("input is array");
+        assert_eq!(input.len(), 1);
+        assert_eq!(input[0]["role"], "user");
+        assert_eq!(input[0]["content"], "hello");
+    }
+
+    #[test]
+    fn build_headers_includes_required_fields() {
+        let headers = CodexProvider::build_headers("tok-abc", "acct-xyz").unwrap();
+        assert_eq!(
+            headers.get("Authorization").unwrap().to_str().unwrap(),
+            "Bearer tok-abc"
+        );
+        assert_eq!(
+            headers.get("chatgpt-account-id").unwrap().to_str().unwrap(),
+            "acct-xyz"
+        );
+        assert_eq!(
+            headers.get("OpenAI-Beta").unwrap().to_str().unwrap(),
+            "responses=experimental"
+        );
+        assert_eq!(
+            headers.get("originator").unwrap().to_str().unwrap(),
+            "temper"
+        );
+        assert!(headers
+            .get("User-Agent")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("temper ("));
+        assert_eq!(
+            headers.get("accept").unwrap().to_str().unwrap(),
+            "text/event-stream"
+        );
+        assert_eq!(
+            headers.get("content-type").unwrap().to_str().unwrap(),
+            "application/json"
+        );
+    }
+}

@@ -186,57 +186,43 @@ async fn authorize_tool(
     eprintln!("  [governance] tools.{action}(\"{resource_id}\") needs approval: {decision_id}");
     eprintln!("  [governance] Waiting for human decision via `temper decide` or Observe UI...");
 
+    let config = temper_sandbox::governance::PollConfig {
+        timeout: std::time::Duration::from_secs(300),
+        ..temper_sandbox::governance::PollConfig::default()
+    };
+    let http = http.clone();
     let poll_url = format!("{server_url}/api/tenants/{tenant}/decisions?status=all");
-    let start = std::time::Instant::now(); // determinism-ok: CLI timeout
-    let timeout = std::time::Duration::from_secs(300);
-
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-        if start.elapsed() > timeout {
-            return Err(format!(
-                "tools.{action} on '{resource_id}' denied — approval timed out after 5 min. \
-                 Decision: {decision_id}"
-            ));
-        }
-
-        let poll_resp = http
-            .get(&poll_url)
-            .header("Accept", "application/json")
-            .send()
-            .await
-            .map_err(|e| format!("failed to poll decisions: {e}"))?;
-
-        let poll_text = poll_resp
-            .text()
-            .await
-            .map_err(|e| format!("failed to read poll response: {e}"))?;
-
-        let poll_body: Value = serde_json::from_str(&poll_text).unwrap_or_default();
-        let decisions = poll_body
-            .get("decisions")
-            .and_then(Value::as_array)
-            .or_else(|| poll_body.as_array())
-            .cloned()
-            .unwrap_or_default();
-
-        for d in &decisions {
-            if d.get("id").and_then(Value::as_str) == Some(&decision_id) {
-                let status = d.get("status").and_then(Value::as_str).unwrap_or("");
-
-                match status {
-                    "Approved" | "approved" => {
-                        eprintln!("  [governance] Approved! Proceeding.");
-                        return Ok(());
-                    }
-                    "Denied" | "denied" | "Rejected" | "rejected" => {
-                        return Err(format!(
-                            "tools.{action} on '{resource_id}' denied by human. Decision: {decision_id}"
-                        ));
-                    }
-                    _ => {} // Still pending, keep polling.
-                }
+    let (_decision, outcome) = temper_sandbox::governance::poll_decision(
+        &decision_id,
+        &config,
+        || {
+            let http = http.clone();
+            let poll_url = poll_url.clone();
+            async move {
+                let resp = http
+                    .get(&poll_url)
+                    .header("Accept", "application/json")
+                    .send()
+                    .await
+                    .map_err(|e| format!("failed to poll decisions: {e}"))?;
+                let text = resp
+                    .text()
+                    .await
+                    .map_err(|e| format!("failed to read poll response: {e}"))?;
+                serde_json::from_str(&text)
+                    .map_err(|e| format!("failed to parse poll response: {e}"))
             }
+        },
+    )
+    .await?;
+
+    match outcome {
+        temper_sandbox::governance::DecisionOutcome::Approved => {
+            eprintln!("  [governance] Approved! Proceeding.");
+            Ok(())
         }
+        _ => Err(format!(
+            "tools.{action} on '{resource_id}' denied by human. Decision: {decision_id}"
+        )),
     }
 }
