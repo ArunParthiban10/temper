@@ -442,7 +442,12 @@ impl RecordHeader {
         let year = now.format("%Y");
         let full_uuid = uuid::Uuid::now_v7().to_string();
         // Take the last 12 hex chars (skipping hyphens) for ~48 bits of entropy.
-        let suffix: String = full_uuid.chars().filter(|c| *c != '-').rev().take(12).collect();
+        let suffix: String = full_uuid
+            .chars()
+            .filter(|c| *c != '-')
+            .rev()
+            .take(12)
+            .collect();
         let id = format!("{}-{}-{}", record_type.prefix(), year, suffix);
 
         Self {

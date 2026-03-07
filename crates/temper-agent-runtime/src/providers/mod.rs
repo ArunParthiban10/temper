@@ -59,7 +59,9 @@ mod tests {
 
     #[test]
     fn content_block_text_round_trip() {
-        let block = ContentBlock::Text { text: "hello".to_string() };
+        let block = ContentBlock::Text {
+            text: "hello".to_string(),
+        };
         let serialized = serde_json::to_value(&block).unwrap();
         assert_eq!(serialized["type"], "text");
         assert_eq!(serialized["text"], "hello");
@@ -103,7 +105,11 @@ mod tests {
         assert_eq!(serialized["is_error"], true);
         let deserialized: ContentBlock = serde_json::from_value(serialized).unwrap();
         match deserialized {
-            ContentBlock::ToolResult { tool_use_id, content, is_error } => {
+            ContentBlock::ToolResult {
+                tool_use_id,
+                content,
+                is_error,
+            } => {
                 assert_eq!(tool_use_id, "tu_1");
                 assert_eq!(content, "result text");
                 assert_eq!(is_error, Some(true));
@@ -127,7 +133,9 @@ mod tests {
     fn message_round_trip() {
         let msg = Message {
             role: "user".to_string(),
-            content: vec![ContentBlock::Text { text: "hi".to_string() }],
+            content: vec![ContentBlock::Text {
+                text: "hi".to_string(),
+            }],
         };
         let serialized = serde_json::to_value(&msg).unwrap();
         assert_eq!(serialized["role"], "user");

@@ -192,10 +192,8 @@ async fn authorize_tool(
     };
     let http = http.clone();
     let poll_url = format!("{server_url}/api/tenants/{tenant}/decisions?status=all");
-    let (_decision, outcome) = temper_sandbox::governance::poll_decision(
-        &decision_id,
-        &config,
-        || {
+    let (_decision, outcome) =
+        temper_sandbox::governance::poll_decision(&decision_id, &config, || {
             let http = http.clone();
             let poll_url = poll_url.clone();
             async move {
@@ -212,9 +210,8 @@ async fn authorize_tool(
                 serde_json::from_str(&text)
                     .map_err(|e| format!("failed to parse poll response: {e}"))
             }
-        },
-    )
-    .await?;
+        })
+        .await?;
 
     match outcome {
         temper_sandbox::governance::DecisionOutcome::Approved => {

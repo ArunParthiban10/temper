@@ -122,10 +122,8 @@ async fn dispatch_method(
                 entity_set_resolver: None,
                 binary_path: None,
             };
-            temper_sandbox::dispatch::dispatch_temper_method(
-                &ctx, function_name, args, kwargs,
-            )
-            .await
+            temper_sandbox::dispatch::dispatch_temper_method(&ctx, function_name, args, kwargs)
+                .await
         }
         "Tools" => {
             dispatch::dispatch_tools_method(

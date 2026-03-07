@@ -40,11 +40,21 @@ pub struct PersistedSpecRow {
 }
 
 impl SpecRowLike for PersistedSpecRow {
-    fn verification_status(&self) -> &str { &self.verification_status }
-    fn verified(&self) -> bool { self.verified }
-    fn levels_passed(&self) -> Option<i32> { self.levels_passed }
-    fn levels_total(&self) -> Option<i32> { self.levels_total }
-    fn updated_at_rfc3339(&self) -> String { self.updated_at.to_rfc3339() }
+    fn verification_status(&self) -> &str {
+        &self.verification_status
+    }
+    fn verified(&self) -> bool {
+        self.verified
+    }
+    fn levels_passed(&self) -> Option<i32> {
+        self.levels_passed
+    }
+    fn levels_total(&self) -> Option<i32> {
+        self.levels_total
+    }
+    fn updated_at_rfc3339(&self) -> String {
+        self.updated_at.to_rfc3339()
+    }
     fn try_parse_verification_result(&self) -> Option<EntityVerificationResult> {
         self.verification_result
             .clone()
@@ -53,11 +63,21 @@ impl SpecRowLike for PersistedSpecRow {
 }
 
 impl SpecRowLike for temper_store_turso::TursoSpecRow {
-    fn verification_status(&self) -> &str { &self.verification_status }
-    fn verified(&self) -> bool { self.verified }
-    fn levels_passed(&self) -> Option<i32> { self.levels_passed }
-    fn levels_total(&self) -> Option<i32> { self.levels_total }
-    fn updated_at_rfc3339(&self) -> String { self.updated_at.clone() }
+    fn verification_status(&self) -> &str {
+        &self.verification_status
+    }
+    fn verified(&self) -> bool {
+        self.verified
+    }
+    fn levels_passed(&self) -> Option<i32> {
+        self.levels_passed
+    }
+    fn levels_total(&self) -> Option<i32> {
+        self.levels_total
+    }
+    fn updated_at_rfc3339(&self) -> String {
+        self.updated_at.clone()
+    }
     fn try_parse_verification_result(&self) -> Option<EntityVerificationResult> {
         self.verification_result
             .as_ref()
@@ -209,7 +229,11 @@ pub async fn restore_registry_from_postgres(
         registry,
         grouped,
         &mut constraints_by_tenant,
-        |rows| rows.iter().find_map(|r| r.csdl_xml.clone()).unwrap_or_default(),
+        |rows| {
+            rows.iter()
+                .find_map(|r| r.csdl_xml.clone())
+                .unwrap_or_default()
+        },
         |row| (row.entity_type.clone(), row.ioa_source.clone()),
     )
 }
@@ -246,7 +270,11 @@ pub async fn restore_registry_from_turso(
         registry,
         grouped,
         &mut constraints_by_tenant,
-        |rows| rows.iter().find_map(|r| r.csdl_xml.clone()).unwrap_or_default(),
+        |rows| {
+            rows.iter()
+                .find_map(|r| r.csdl_xml.clone())
+                .unwrap_or_default()
+        },
         |row| (row.entity_type.clone(), row.ioa_source.clone()),
     )
 }
@@ -266,11 +294,21 @@ mod tests {
     }
 
     impl SpecRowLike for MockRow {
-        fn verification_status(&self) -> &str { &self.status }
-        fn verified(&self) -> bool { self.verified }
-        fn levels_passed(&self) -> Option<i32> { self.levels_passed }
-        fn levels_total(&self) -> Option<i32> { self.levels_total }
-        fn updated_at_rfc3339(&self) -> String { self.updated_at.clone() }
+        fn verification_status(&self) -> &str {
+            &self.status
+        }
+        fn verified(&self) -> bool {
+            self.verified
+        }
+        fn levels_passed(&self) -> Option<i32> {
+            self.levels_passed
+        }
+        fn levels_total(&self) -> Option<i32> {
+            self.levels_total
+        }
+        fn updated_at_rfc3339(&self) -> String {
+            self.updated_at.clone()
+        }
         fn try_parse_verification_result(&self) -> Option<EntityVerificationResult> {
             self.verification_result.clone()
         }
@@ -278,19 +316,40 @@ mod tests {
 
     #[test]
     fn row_to_registry_status_pending() {
-        let status = row_to_registry_status(&MockRow { status: "pending".into(), verified: false, levels_passed: None, levels_total: None, updated_at: "2024-01-01T00:00:00Z".into(), verification_result: None });
+        let status = row_to_registry_status(&MockRow {
+            status: "pending".into(),
+            verified: false,
+            levels_passed: None,
+            levels_total: None,
+            updated_at: "2024-01-01T00:00:00Z".into(),
+            verification_result: None,
+        });
         assert!(matches!(status, VerificationStatus::Pending));
     }
 
     #[test]
     fn row_to_registry_status_running() {
-        let status = row_to_registry_status(&MockRow { status: "running".into(), verified: false, levels_passed: None, levels_total: None, updated_at: "2024-01-01T00:00:00Z".into(), verification_result: None });
+        let status = row_to_registry_status(&MockRow {
+            status: "running".into(),
+            verified: false,
+            levels_passed: None,
+            levels_total: None,
+            updated_at: "2024-01-01T00:00:00Z".into(),
+            verification_result: None,
+        });
         assert!(matches!(status, VerificationStatus::Running));
     }
 
     #[test]
     fn row_to_registry_status_passed() {
-        let status = row_to_registry_status(&MockRow { status: "passed".into(), verified: true, levels_passed: Some(3), levels_total: Some(3), updated_at: "2024-01-01T00:00:00Z".into(), verification_result: None });
+        let status = row_to_registry_status(&MockRow {
+            status: "passed".into(),
+            verified: true,
+            levels_passed: Some(3),
+            levels_total: Some(3),
+            updated_at: "2024-01-01T00:00:00Z".into(),
+            verification_result: None,
+        });
         match status {
             VerificationStatus::Restored(result) => assert!(result.all_passed),
             other => panic!("Expected Restored, got {other:?}"),
@@ -299,7 +358,14 @@ mod tests {
 
     #[test]
     fn row_to_registry_status_failed() {
-        let status = row_to_registry_status(&MockRow { status: "failed".into(), verified: false, levels_passed: Some(1), levels_total: Some(3), updated_at: "2024-01-01T00:00:00Z".into(), verification_result: None });
+        let status = row_to_registry_status(&MockRow {
+            status: "failed".into(),
+            verified: false,
+            levels_passed: Some(1),
+            levels_total: Some(3),
+            updated_at: "2024-01-01T00:00:00Z".into(),
+            verification_result: None,
+        });
         match status {
             VerificationStatus::Restored(result) => {
                 assert!(!result.all_passed);

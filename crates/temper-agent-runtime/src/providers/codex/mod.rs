@@ -393,12 +393,14 @@ mod tests {
             headers.get("originator").unwrap().to_str().unwrap(),
             "temper"
         );
-        assert!(headers
-            .get("User-Agent")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .starts_with("temper ("));
+        assert!(
+            headers
+                .get("User-Agent")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("temper (")
+        );
         assert_eq!(
             headers.get("accept").unwrap().to_str().unwrap(),
             "text/event-stream"
