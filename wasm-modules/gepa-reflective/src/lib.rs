@@ -176,19 +176,21 @@ temper_module! {
              from {total_trajectories} trajectories"
         ));
 
+        let dataset = json!({
+            "skill_name": skill_name,
+            "entity_type": entity_type,
+            "spec_source": spec_source,
+            "workflow_triplets": workflow_triplets,
+            "patterns": patterns,
+            "verification_feedback": verification_feedback,
+            "workflow_completion_rate": workflow_completion_rate,
+            "total_trajectories": total_trajectories,
+            "failure_count": failure_count,
+            "success_count": success_count,
+        });
+
         Ok(json!({
-            "reflective_dataset": {
-                "skill_name": skill_name,
-                "entity_type": entity_type,
-                "spec_source": spec_source,
-                "workflow_triplets": workflow_triplets,
-                "patterns": patterns,
-                "verification_feedback": verification_feedback,
-                "workflow_completion_rate": workflow_completion_rate,
-                "total_trajectories": total_trajectories,
-                "failure_count": failure_count,
-                "success_count": success_count,
-            }
+            "DatasetJson": dataset.to_string()
         }))
     }
 }

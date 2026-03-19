@@ -121,7 +121,7 @@ temper_module! {
         ));
 
         Ok(json!({
-            "scores": scores,
+            "ScoresJson": scores.to_string(),
         }))
     }
 }

@@ -20,18 +20,33 @@ temper_module! {
             .cloned()
             .unwrap_or_default();
 
-        // Read new candidate from trigger params (scores + id)
-        let candidate = ctx.trigger_params
-            .get("candidate")
-            .or_else(|| ctx.trigger_params.get("result"))
-            .unwrap_or(&ctx.trigger_params);
+        // Read new candidate scores — may come as ScoresJson string or nested object
+        let scores_raw = ctx.trigger_params
+            .get("ScoresJson")
+            .or_else(|| fields.get("ScoresJson"));
+        let scores_parsed: Value = match scores_raw {
+            Some(Value::String(s)) => serde_json::from_str(s).unwrap_or(json!({})),
+            Some(v) => v.clone(),
+            None => {
+                // Fallback: try candidate.scores pattern
+                ctx.trigger_params
+                    .get("candidate")
+                    .and_then(|c| c.get("scores"))
+                    .cloned()
+                    .unwrap_or(json!({}))
+            }
+        };
 
-        let candidate_id = candidate.get("id")
+        let candidate_id = fields
+            .get("CandidateId")
             .and_then(Value::as_str)
+            .or_else(|| ctx.trigger_params.get("CandidateId").and_then(Value::as_str))
             .unwrap_or("unknown");
-        let candidate_scores = candidate.get("scores")
-            .and_then(Value::as_object)
+        let candidate_scores = scores_parsed
+            .as_object()
             .ok_or("candidate missing 'scores'")?;
+        // Build candidate object for frontier storage
+        let candidate = json!({"id": candidate_id, "scores": candidate_scores});
 
         // Check if candidate is dominated by any frontier member
         let mut is_dominated = false;
@@ -62,10 +77,13 @@ temper_module! {
             ctx.log("info", &format!(
                 "gepa-pareto: candidate {candidate_id} is dominated, not added"
             ));
-            return Ok(json!({
+            let update = json!({
                 "added": false,
                 "frontier_size": frontier.len(),
                 "removed": [],
+            });
+            return Ok(json!({
+                "FrontierUpdateJson": update.to_string(),
             }));
         }
 
@@ -85,11 +103,14 @@ temper_module! {
             new_frontier.len()
         ));
 
-        Ok(json!({
+        let update = json!({
             "added": true,
             "frontier": new_frontier,
             "frontier_size": new_frontier.len(),
             "removed": dominated_members,
+        });
+        Ok(json!({
+            "FrontierUpdateJson": update.to_string(),
         }))
     }
 }

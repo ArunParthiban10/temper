@@ -220,7 +220,7 @@ temper_module! {
              {total_succeeded}/{total_attempted} actions succeeded"
         ));
 
-        Ok(json!({
+        let replay = json!({
             "replay_result": {
                 "workflows_attempted": workflows_attempted,
                 "workflows_completed": workflows_completed,
@@ -237,6 +237,10 @@ temper_module! {
                 "workflows": workflows,
                 "errors": all_errors,
             }
+        });
+
+        Ok(json!({
+            "ReplayResultJson": replay.to_string()
         }))
     }
 }

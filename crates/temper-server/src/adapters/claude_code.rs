@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use tokio::process::Command;
+use tracing::{debug, warn};
 
 use super::{AdapterContext, AdapterError, AdapterResult, AgentAdapter};
 
@@ -85,6 +86,12 @@ async fn run_claude(
         }
     }
 
+    // System prompt override — forces the spawned agent to focus on the task,
+    // preventing session hooks and CLAUDE.md from overwhelming the prompt data.
+    if let Some(system_prompt) = ctx.integration_config.get("system_prompt") {
+        command.arg("--system-prompt").arg(system_prompt);
+    }
+
     if let Some(workdir) = ctx.integration_config.get("workdir")
         && !workdir.trim().is_empty()
     {
@@ -107,18 +114,51 @@ async fn run_claude(
     pass_entity_context_as_env(&mut command, ctx);
 
     // Build prompt with template interpolation.
-    if let Some(template) = ctx.integration_config.get("prompt")
+    // Pipe via stdin instead of CLI arg to avoid OS ARG_MAX limits on large prompts.
+    let prompt = if let Some(template) = ctx.integration_config.get("prompt")
         && !template.trim().is_empty()
     {
         let entity_fields = ctx.entity_state.get("fields").unwrap_or(&ctx.entity_state);
-        let prompt = interpolate_prompt(template, &ctx.trigger_params, entity_fields);
-        command.arg(prompt);
+        let interpolated = interpolate_prompt(template, &ctx.trigger_params, entity_fields);
+        debug!(
+            prompt_len = interpolated.len(),
+            has_unresolved = interpolated.contains("{DatasetJson}") || interpolated.contains("{SpecSource}"),
+            "claude_code adapter: interpolated prompt"
+        );
+        if interpolated.len() > 100_000 {
+            debug!("claude_code adapter: prompt preview (first 500 chars): {}", &interpolated[..500.min(interpolated.len())]);
+        }
+        Some(interpolated)
+    } else {
+        None
+    };
+
+    // Use stdin for the prompt to avoid ARG_MAX limits.
+    // Claude Code in --print mode reads from stdin when no positional prompt is given.
+    if prompt.is_some() {
+        command.stdin(std::process::Stdio::piped());
     }
 
-    let output = command
-        .output()
-        .await
+    let mut child = command
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .map_err(|e| AdapterError::Invocation(format!("failed to spawn '{command_name}': {e}")))?;
+
+    // Write prompt to stdin if present
+    if let Some(ref prompt_text) = prompt {
+        use tokio::io::AsyncWriteExt;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(prompt_text.as_bytes()).await
+                .map_err(|e| AdapterError::Invocation(format!("failed to write prompt to stdin: {e}")))?;
+            // Drop stdin to signal EOF
+            drop(stdin);
+        }
+    }
+
+    let output = child.wait_with_output()
+        .await
+        .map_err(|e| AdapterError::Invocation(format!("failed to wait for '{command_name}': {e}")))?;
 
     let duration_ms = started.elapsed().as_millis() as u64;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -173,7 +213,10 @@ fn interpolate_prompt(
             let value = trigger_params.get(&key).or_else(|| entity_fields.get(&key));
 
             match value {
-                Some(serde_json::Value::String(s)) => result.push_str(s),
+                Some(serde_json::Value::String(s)) => {
+                    debug!(key = %key, value_len = s.len(), "prompt interpolation: resolved string key");
+                    result.push_str(s);
+                }
                 Some(v) => {
                     // Pretty-print objects/arrays for readability
                     if let Ok(pretty) = serde_json::to_string_pretty(v) {
@@ -184,6 +227,7 @@ fn interpolate_prompt(
                 }
                 None => {
                     // Unresolved — leave placeholder visible
+                    warn!(key = %key, "prompt interpolation: unresolved placeholder");
                     result.push('{');
                     result.push_str(&key);
                     result.push('}');

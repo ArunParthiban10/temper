@@ -194,6 +194,7 @@ type = "adapter"
 adapter = "claude_code"
 on_success = "RecordMutation"
 on_failure = "Fail"
+system_prompt = "You are a GEPA evolution agent. Your ONLY job is to read the user message containing a spec and reflective dataset, then return a JSON response with MutatedSpecSource and MutationSummary. Do NOT read files, do NOT use tools, do NOT ask questions, do NOT reference CLAUDE.md or any session context. Just process the data in the user message and return the JSON."
 prompt = """You are the GEPA evolution agent for the '{TargetEntityType}' entity type in the '{SkillName}' skill.
 
 ## Current Spec
@@ -201,31 +202,27 @@ prompt = """You are the GEPA evolution agent for the '{TargetEntityType}' entity
 {SpecSource}
 ```
 
-## Workflow Analysis
+## Reflective Dataset (Full Workflow Analysis)
 
-The following are complete agent workflow attempts — both successes AND failures.
-Each triplet shows what the agent tried, what happened, and specific improvement suggestions.
+The following JSON contains the complete reflective dataset — workflow triplets (each with input/output/feedback/score), cross-trajectory patterns, and the spec source. Each triplet represents one full agent workflow attempt.
 
-### Workflow Triplets
-{workflow_triplets}
-
-### Cross-Trajectory Patterns
-{patterns}
-
-## Verification Feedback
-{verification_feedback}
+```json
+{DatasetJson}
+```
 
 ## Instructions
 
-1. Read every workflow triplet above. Understand the FULL picture — successes AND failures.
-2. Triplets marked "PRESERVE" represent working patterns. Your mutation MUST NOT regress these.
-3. For failed/partial workflows, the feedback field contains specific fix suggestions (e.g., "Add action X with from states Y").
-4. Apply the MINIMAL set of changes that fixes the failures while preserving all successes.
-5. If verification feedback is present, your previous mutation was rejected — fix those specific issues.
+1. Parse the reflective dataset JSON above. Read every workflow_triplet.
+2. Each triplet has: input (what the agent tried + reasoning chain), output (what happened), feedback (specific fix suggestion), score (1.0=success, 0.5=partial, 0.0=failed), preserve (true=do not regress).
+3. The patterns section shows common_failure_points, missing_capabilities, and guard_friction across all workflows.
+4. Triplets with preserve=true represent working patterns. Your mutation MUST NOT regress these.
+5. For failed/partial workflows, apply the feedback suggestion (e.g., "Add action X with from states Y").
+6. Apply the MINIMAL set of changes. Do not restructure the spec — only add missing actions or fix transitions.
+7. If verification_feedback is non-empty, your previous mutation was rejected. Fix those specific issues.
+8. All new actions must respect existing invariants (e.g., ArchivedIsFinal, InProgressRequiresAssignee).
 
-Return your response as JSON with two fields:
-- "MutatedSpecSource": the full updated IOA TOML spec source
-- "MutationSummary": a brief description of what changed and why"""
+Return ONLY valid JSON with exactly two fields:
+{"MutatedSpecSource": "<the full updated IOA TOML spec>", "MutationSummary": "<what changed and why>"}"""
 
 [[integration]]
 name = "score_candidate"
