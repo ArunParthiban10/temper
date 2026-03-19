@@ -48,7 +48,7 @@ kind = "input"
 from = ["Selecting"]
 to = "Evaluating"
 effect = [{ type = "increment", var = "candidate_count" }, { type = "trigger", name = "evaluate_candidate" }]
-params = ["CandidateId", "SpecSource", "TrajectoryActions"]
+params = ["CandidateId", "SpecSource", "TrajectoryActions", "Trajectories"]
 hint = "Select a candidate spec from the Pareto frontier or seed pool."
 
 [[action]]
@@ -194,7 +194,38 @@ type = "adapter"
 adapter = "claude_code"
 on_success = "RecordMutation"
 on_failure = "Fail"
-prompt = "You are the GEPA evolution agent. Read the reflective dataset in trigger_params.DatasetJson — it contains failure traces showing why the current spec doesn't work. Propose a minimal IOA spec mutation that fixes the failures while preserving all existing working behavior. Return the full mutated spec source and a summary of what changed."
+prompt = """You are the GEPA evolution agent for the '{TargetEntityType}' entity type in the '{SkillName}' skill.
+
+## Current Spec
+```toml
+{SpecSource}
+```
+
+## Workflow Analysis
+
+The following are complete agent workflow attempts — both successes AND failures.
+Each triplet shows what the agent tried, what happened, and specific improvement suggestions.
+
+### Workflow Triplets
+{workflow_triplets}
+
+### Cross-Trajectory Patterns
+{patterns}
+
+## Verification Feedback
+{verification_feedback}
+
+## Instructions
+
+1. Read every workflow triplet above. Understand the FULL picture — successes AND failures.
+2. Triplets marked "PRESERVE" represent working patterns. Your mutation MUST NOT regress these.
+3. For failed/partial workflows, the feedback field contains specific fix suggestions (e.g., "Add action X with from states Y").
+4. Apply the MINIMAL set of changes that fixes the failures while preserving all successes.
+5. If verification feedback is present, your previous mutation was rejected — fix those specific issues.
+
+Return your response as JSON with two fields:
+- "MutatedSpecSource": the full updated IOA TOML spec source
+- "MutationSummary": a brief description of what changed and why"""
 
 [[integration]]
 name = "score_candidate"

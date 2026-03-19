@@ -102,9 +102,16 @@ async fn run_claude(
         .env("TEMPER_TASK_ID", ctx.entity_id.clone())
         .env("TEMPER_WAKE_REASON", ctx.trigger_action.clone());
 
-    if let Some(prompt) = ctx.integration_config.get("prompt")
-        && !prompt.trim().is_empty()
+    // Generic context passing: expose entity state and trigger params as env vars.
+    // Any adapter integration can reference these — not specific to any use case.
+    pass_entity_context_as_env(&mut command, ctx);
+
+    // Build prompt with template interpolation.
+    if let Some(template) = ctx.integration_config.get("prompt")
+        && !template.trim().is_empty()
     {
+        let entity_fields = ctx.entity_state.get("fields").unwrap_or(&ctx.entity_state);
+        let prompt = interpolate_prompt(template, &ctx.trigger_params, entity_fields);
         command.arg(prompt);
     }
 
@@ -127,6 +134,94 @@ async fn run_claude(
             stderr.trim().to_string()
         };
         Ok(AdapterResult::failure(detail, duration_ms))
+    }
+}
+
+/// Interpolate `{key}` placeholders in a prompt template from trigger params and entity fields.
+///
+/// Lookup order: trigger_params → entity_state.fields → integration_config.
+/// String values are inserted directly. Objects/arrays are pretty-printed as JSON.
+/// Unresolved placeholders are left as-is so the LLM sees what was expected.
+fn interpolate_prompt(
+    template: &str,
+    trigger_params: &serde_json::Value,
+    entity_fields: &serde_json::Value,
+) -> String {
+    let mut result = String::with_capacity(template.len() * 2);
+    let mut chars = template.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '{' {
+            // Collect the key name until '}'
+            let mut key = String::new();
+            let mut found_close = false;
+            for inner in chars.by_ref() {
+                if inner == '}' {
+                    found_close = true;
+                    break;
+                }
+                key.push(inner);
+            }
+            if !found_close || key.is_empty() {
+                // Malformed placeholder — emit as-is
+                result.push('{');
+                result.push_str(&key);
+                continue;
+            }
+
+            // Look up value: trigger_params first, then entity fields
+            let value = trigger_params
+                .get(&key)
+                .or_else(|| entity_fields.get(&key));
+
+            match value {
+                Some(serde_json::Value::String(s)) => result.push_str(s),
+                Some(v) => {
+                    // Pretty-print objects/arrays for readability
+                    if let Ok(pretty) = serde_json::to_string_pretty(v) {
+                        result.push_str(&pretty);
+                    } else {
+                        result.push_str(&v.to_string());
+                    }
+                }
+                None => {
+                    // Unresolved — leave placeholder visible
+                    result.push('{');
+                    result.push_str(&key);
+                    result.push('}');
+                }
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+/// Pass entity state fields and trigger params as environment variables.
+///
+/// Scalar string values become `TEMPER_FIELD_<KEY>` and `TEMPER_PARAM_<KEY>`.
+/// This is a generic capability — any spawned agent process can read these.
+fn pass_entity_context_as_env(command: &mut Command, ctx: &AdapterContext) {
+    if let Some(fields) = ctx.entity_state.get("fields").and_then(|v| v.as_object()) {
+        for (key, value) in fields {
+            if let Some(s) = value.as_str() {
+                // Cap env var values at 4KB to avoid OS limits
+                if s.len() <= 4096 {
+                    command.env(format!("TEMPER_FIELD_{}", key.to_uppercase()), s);
+                }
+            }
+        }
+    }
+    if let Some(params) = ctx.trigger_params.as_object() {
+        for (key, value) in params {
+            if let Some(s) = value.as_str() {
+                if s.len() <= 4096 {
+                    command.env(format!("TEMPER_PARAM_{}", key.to_uppercase()), s);
+                }
+            }
+        }
     }
 }
 
@@ -159,4 +254,47 @@ fn parse_stream_json_output(stdout: &str) -> serde_json::Value {
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interpolate_simple_string() {
+        let template = "Hello {name}, you are working on {task}";
+        let params = serde_json::json!({"name": "Claude"});
+        let fields = serde_json::json!({"task": "evolution"});
+        let result = interpolate_prompt(template, &params, &fields);
+        assert_eq!(result, "Hello Claude, you are working on evolution");
+    }
+
+    #[test]
+    fn test_interpolate_missing_key() {
+        let template = "Spec: {spec_source}, Missing: {unknown}";
+        let params = serde_json::json!({"spec_source": "[automaton]\nname = \"Issue\""});
+        let fields = serde_json::json!({});
+        let result = interpolate_prompt(template, &params, &fields);
+        assert!(result.contains("[automaton]"));
+        assert!(result.contains("{unknown}"));
+    }
+
+    #[test]
+    fn test_interpolate_json_object() {
+        let template = "Patterns: {patterns}";
+        let params = serde_json::json!({"patterns": {"failures": 3, "successes": 7}});
+        let fields = serde_json::json!({});
+        let result = interpolate_prompt(template, &params, &fields);
+        assert!(result.contains("failures"));
+        assert!(result.contains("successes"));
+    }
+
+    #[test]
+    fn test_interpolate_trigger_params_priority() {
+        let template = "Value: {key}";
+        let params = serde_json::json!({"key": "from_trigger"});
+        let fields = serde_json::json!({"key": "from_entity"});
+        let result = interpolate_prompt(template, &params, &fields);
+        assert_eq!(result, "Value: from_trigger");
+    }
 }
