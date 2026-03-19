@@ -122,11 +122,15 @@ async fn run_claude(
         let interpolated = interpolate_prompt(template, &ctx.trigger_params, entity_fields);
         debug!(
             prompt_len = interpolated.len(),
-            has_unresolved = interpolated.contains("{DatasetJson}") || interpolated.contains("{SpecSource}"),
+            has_unresolved =
+                interpolated.contains("{DatasetJson}") || interpolated.contains("{SpecSource}"),
             "claude_code adapter: interpolated prompt"
         );
         if interpolated.len() > 100_000 {
-            debug!("claude_code adapter: prompt preview (first 500 chars): {}", &interpolated[..500.min(interpolated.len())]);
+            debug!(
+                "claude_code adapter: prompt preview (first 500 chars): {}",
+                &interpolated[..500.min(interpolated.len())]
+            );
         }
         Some(interpolated)
     } else {
@@ -149,16 +153,17 @@ async fn run_claude(
     if let Some(ref prompt_text) = prompt {
         use tokio::io::AsyncWriteExt;
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(prompt_text.as_bytes()).await
-                .map_err(|e| AdapterError::Invocation(format!("failed to write prompt to stdin: {e}")))?;
+            stdin.write_all(prompt_text.as_bytes()).await.map_err(|e| {
+                AdapterError::Invocation(format!("failed to write prompt to stdin: {e}"))
+            })?;
             // Drop stdin to signal EOF
             drop(stdin);
         }
     }
 
-    let output = child.wait_with_output()
-        .await
-        .map_err(|e| AdapterError::Invocation(format!("failed to wait for '{command_name}': {e}")))?;
+    let output = child.wait_with_output().await.map_err(|e| {
+        AdapterError::Invocation(format!("failed to wait for '{command_name}': {e}"))
+    })?;
 
     let duration_ms = started.elapsed().as_millis() as u64;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
