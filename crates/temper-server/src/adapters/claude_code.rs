@@ -170,9 +170,7 @@ fn interpolate_prompt(
             }
 
             // Look up value: trigger_params first, then entity fields
-            let value = trigger_params
-                .get(&key)
-                .or_else(|| entity_fields.get(&key));
+            let value = trigger_params.get(&key).or_else(|| entity_fields.get(&key));
 
             match value {
                 Some(serde_json::Value::String(s)) => result.push_str(s),
