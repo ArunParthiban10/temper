@@ -214,10 +214,10 @@ fn pass_entity_context_as_env(command: &mut Command, ctx: &AdapterContext) {
     }
     if let Some(params) = ctx.trigger_params.as_object() {
         for (key, value) in params {
-            if let Some(s) = value.as_str() {
-                if s.len() <= 4096 {
-                    command.env(format!("TEMPER_PARAM_{}", key.to_uppercase()), s);
-                }
+            if let Some(s) = value.as_str()
+                && s.len() <= 4096
+            {
+                command.env(format!("TEMPER_PARAM_{}", key.to_uppercase()), s);
             }
         }
     }
