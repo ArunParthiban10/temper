@@ -44,6 +44,14 @@ pub extern "C" fn run(_ctx_ptr: i32, _ctx_len: i32) -> i32 {
             .get("conversation_file_id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+        let session_file_id = fields
+            .get("session_file_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let session_leaf_id = fields
+            .get("session_leaf_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         // Build SandboxReady params to forward existing state
         let sandbox_ready_params = json!({
@@ -52,6 +60,8 @@ pub extern "C" fn run(_ctx_ptr: i32, _ctx_len: i32) -> i32 {
             "workspace_id": workspace_id,
             "conversation_file_id": conversation_file_id,
             "file_manifest_id": file_manifest_id,
+            "session_file_id": session_file_id,
+            "session_leaf_id": session_leaf_id,
         });
 
         if file_manifest_id.is_empty() {
