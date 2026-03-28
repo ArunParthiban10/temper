@@ -179,7 +179,7 @@ WASM modules use `host_http_call` (async I/O handled by host, not WASM) and are 
 
 ## Alternatives Considered
 
-1. **Rust crate with coded agent loop (`temper-agent`)** — A Rust binary with a `while` loop calling LLM API and executing tools. Rejected because it bypasses Temper's spec-driven philosophy. The agent loop IS the state machine — coding it in Rust defeats the purpose.
+1. **Rust crate with coded agent loop** — A Rust binary with a `while` loop calling LLM API and executing tools. Rejected because it bypasses Temper's spec-driven philosophy. The agent loop IS the state machine — coding it in Rust defeats the purpose.
 
 2. **Three new Rust adapters (LlmAdapter, ToolRunnerAdapter, SandboxAdapter)** — Native Rust adapters registered in AdapterRegistry. Rejected because (a) not hot-reloadable, (b) all operations are HTTP calls suitable for WASM, (c) adds permanent Rust code for what should be app-level logic.
 
@@ -189,4 +189,4 @@ WASM modules use `host_http_call` (async I/O handled by host, not WASM) and are 
 
 ## Rollback Policy
 
-The temper-agent OS app lives in `os-apps/temper-agent/` and can be unregistered from the platform without affecting other apps. WASM modules are loaded on demand. No changes to core framework code — rollback is removing the OS app directory and its platform registration.
+The concrete agent OS app can live outside the core Temper repo and still be unregistered from the platform without affecting other apps. WASM modules are loaded on demand. No changes to core framework code — rollback is removing the OS app registration and its packaged assets.

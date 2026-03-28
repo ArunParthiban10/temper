@@ -13,7 +13,7 @@
 
 ## Context
 
-WASM modules in temper-agent need to execute processes in E2B cloud sandboxes. E2B's envd daemon exposes process execution via the **Connect protocol** — a protobuf RPC framework that works over HTTP/1.1 with JSON encoding.
+WASM modules that execute processes in E2B cloud sandboxes need to speak the **Connect protocol** exposed by envd — a protobuf RPC framework that works over HTTP/1.1 with JSON encoding.
 
 The existing `host_http_call` returns `(status_code, response_body_string)` which works for standard REST APIs. However, Connect server-streaming RPCs use a **5-byte frame prefix** (1 flag byte + 4 length bytes) per message in the response body. The response is binary-framed even when using JSON encoding, making it incompatible with string-based `host_http_call`.
 

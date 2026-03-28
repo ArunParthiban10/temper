@@ -9,7 +9,6 @@ pub mod adapters;
 mod api;
 pub mod authz;
 pub mod blobs;
-pub mod channels;
 pub mod entity_actor;
 pub mod event_store;
 pub mod events;

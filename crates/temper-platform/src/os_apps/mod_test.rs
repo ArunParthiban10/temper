@@ -116,10 +116,6 @@ fn test_list_skills_returns_catalog() {
         names.contains(&"agent-orchestration"),
         "missing agent-orchestration: {names:?}"
     );
-    assert!(
-        names.contains(&"temper-agent"),
-        "missing temper-agent: {names:?}"
-    );
     assert!(names.contains(&"evolution"), "missing evolution: {names:?}");
     assert!(
         names.contains(&"intent-discovery"),
@@ -201,75 +197,11 @@ fn test_get_skill_project_management() {
 }
 
 #[test]
-fn test_agent_specs_parse() {
-    let bundle = get_skill("temper-agent").expect("temper-agent skill not found");
-    for (entity_type, ioa_source) in &bundle.specs {
-        let result = automaton::parse_automaton(ioa_source);
-        assert!(
-            result.is_ok(),
-            "Agent spec {} failed to parse: {:?}",
-            entity_type,
-            result.err()
-        );
-    }
-}
-
-#[test]
-fn test_agent_csdl_parses() {
-    let bundle = get_skill("temper-agent").expect("temper-agent skill not found");
-    let result = parse_csdl(&bundle.csdl);
-    assert!(
-        result.is_ok(),
-        "Agent CSDL failed to parse: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn test_agent_spec_entity_names() {
-    let bundle = get_skill("temper-agent").expect("temper-agent skill not found");
-    for (entity_type, ioa_source) in &bundle.specs {
-        let a = automaton::parse_automaton(ioa_source).unwrap();
-        assert_eq!(
-            &a.automaton.name, entity_type,
-            "Agent spec name mismatch: expected {entity_type}, got {}",
-            a.automaton.name
-        );
-    }
-}
-
-#[test]
-fn test_agent_specs_verify() {
-    let bundle = get_skill("temper-agent").expect("temper-agent skill not found");
-    for (entity_type, ioa_source) in &bundle.specs {
-        let cascade = VerificationCascade::from_ioa(ioa_source)
-            .with_sim_seeds(3)
-            .with_prop_test_cases(50);
-        let result = cascade.run();
-        assert!(
-            result.all_passed,
-            "Agent spec {} failed verification",
-            entity_type
-        );
-    }
-}
-
-#[test]
 fn test_get_skill_agent_orchestration() {
     let bundle = get_skill("agent-orchestration");
     assert!(bundle.is_some());
     let bundle = bundle.unwrap();
     assert_eq!(bundle.specs.len(), 3);
-    assert!(!bundle.csdl.is_empty());
-    assert!(!bundle.cedar_policies.is_empty());
-}
-
-#[test]
-fn test_get_skill_temper_agent() {
-    let bundle = get_skill("temper-agent");
-    assert!(bundle.is_some());
-    let bundle = bundle.unwrap();
-    assert_eq!(bundle.specs.len(), 8); // TemperAgent + AgentSoul + AgentSkill + AgentMemory + ToolHook + HeartbeatMonitor + CronJob + CronScheduler
     assert!(!bundle.csdl.is_empty());
     assert!(!bundle.cedar_policies.is_empty());
 }
@@ -343,28 +275,6 @@ async fn test_install_skill_agent_orchestration_registers_entities() {
     assert!(registry.get_table(&tenant, "HeartbeatRun").is_some());
     assert!(registry.get_table(&tenant, "Organization").is_some());
     assert!(registry.get_table(&tenant, "BudgetLedger").is_some());
-}
-
-#[tokio::test]
-async fn test_install_temper_agent_auto_installs_temper_fs() {
-    let state = PlatformState::new(None);
-    install_os_app(&state, "test-agent", "temper-agent")
-        .await
-        .expect("install temper-agent");
-    let registry = state.registry.read().unwrap();
-    let tenant = TenantId::new("test-agent");
-    for entity in [
-        "TemperAgent",
-        "Workspace",
-        "File",
-        "Directory",
-        "FileVersion",
-    ] {
-        assert!(
-            registry.get_table(&tenant, entity).is_some(),
-            "missing {entity}"
-        );
-    }
 }
 
 #[tokio::test]
@@ -486,25 +396,6 @@ async fn test_install_skill_activates_tenant_cedar_policies() {
     assert!(
         admin_decision.is_allowed(),
         "expected admin Issue.MoveToTodo to be allowed after skill install: {admin_decision:?}"
-    );
-
-    install_skill(&state, "test-authz", "temper-agent")
-        .await
-        .expect("install temper-agent");
-
-    let mut agent_attrs = HashMap::new();
-    agent_attrs.insert("id".to_string(), serde_json::json!("agent-1"));
-
-    let configure_decision = state.server.authz.authorize_for_tenant(
-        "test-authz",
-        &admin_ctx,
-        "Configure",
-        "TemperAgent",
-        &agent_attrs,
-    );
-    assert!(
-        configure_decision.is_allowed(),
-        "expected admin TemperAgent.Configure to be allowed after skill install: {configure_decision:?}"
     );
 }
 

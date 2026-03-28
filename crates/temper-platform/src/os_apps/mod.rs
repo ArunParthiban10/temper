@@ -534,11 +534,8 @@ fn load_skill_bundle(skill_dir: &Path) -> Option<SkillBundle> {
 }
 
 fn os_app_dependencies(name: &str) -> &'static [&'static str] {
-    match name {
-        // TemperAgent persists conversation/files in TemperFS entities.
-        "temper-agent" => &["temper-fs"],
-        _ => &[],
-    }
+    let _ = name;
+    &[]
 }
 
 /// Install an OS app into a tenant (workspace).

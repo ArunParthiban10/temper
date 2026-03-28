@@ -6,12 +6,12 @@
 - Related:
   - ADR-0029: TemperFS (workspace, file, blob storage)
   - ADR-0031: Temper-native agent (IOA spec-driven agent loop)
-  - `os-apps/temper-agent/wasm/tool_runner/src/lib.rs`
+  - the agent tool-runner WASM integration
   - `os-apps/temper-fs/wasm/blob_adapter/src/lib.rs`
 
 ## Context
 
-The temper-agent has a working agent loop with conversation stored in TemperFS. However, **sandbox filesystem state is ephemeral** — if the sandbox dies, the E2B session expires, or the agent is interrupted, all files created/modified by tool calls are lost. This blocks two critical capabilities:
+The agent loop has working conversation storage in TemperFS. However, **sandbox filesystem state is ephemeral** — if the sandbox dies, the E2B session expires, or the agent is interrupted, all files created/modified by tool calls are lost. This blocks two critical capabilities:
 
 - **Resume**: restart an interrupted agent from where it left off (restore sandbox files + conversation)
 - **Replay**: reconstruct exact agent state at any turn for debugging/auditing

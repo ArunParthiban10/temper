@@ -9,9 +9,6 @@ exclude = [
     "wasm-modules/gepa-proposer-agent",
     "wasm-modules/gepa-verify",
     "crates/temper-wasm/tests/fixtures/echo-integration-src",
-    "os-apps/temper-agent/wasm/llm_caller",
-    "os-apps/temper-agent/wasm/tool_runner",
-    "os-apps/temper-agent/wasm/sandbox_provisioner",
     "os-apps/temper-fs/wasm/blob_adapter",
 ]
 members = [
@@ -39,7 +36,6 @@ members = [
     "crates/temper-sdk",
     "crates/temper-sandbox",
     "crates/temper-ots",
-    "crates/temper-transport",
     "reference-apps/ecommerce",
     "reference-apps/oncall",
 ]
@@ -145,7 +141,6 @@ temper-wasm-sdk = { path = "crates/temper-wasm-sdk" }
 temper-sdk = { path = "crates/temper-sdk" }
 temper-sandbox = { path = "crates/temper-sandbox" }
 temper-ots = { path = "crates/temper-ots" }
-temper-transport = { path = "crates/temper-transport" }
 
 # WASM runtime
 wasmtime = { version = "29", features = ["component-model"] }

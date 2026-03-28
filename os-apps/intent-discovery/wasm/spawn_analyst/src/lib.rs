@@ -1,6 +1,6 @@
 use temper_wasm_sdk::prelude::*;
 
-const EVOLUTION_PROMPT: &str = include_str!("../../../../temper-agent/prompts/evolution_analyst.md");
+const EVOLUTION_PROMPT: &str = include_str!("../../../prompts/evolution_analyst.md");
 
 temper_module! {
     fn run(ctx: Context) -> Result<Value> {

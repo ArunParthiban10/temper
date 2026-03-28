@@ -62,7 +62,6 @@ pub async fn run(
     storage_explicit: bool,
     observe: bool,
     verify_subprocess: bool,
-    discord_bot_token: Option<String>,
     tenant: String,
 ) -> Result<()> {
     let _otel_guard = init_observability("temper-platform");
@@ -179,54 +178,19 @@ pub async fn run(
             }
         }
 
-        // sandbox_url — local sandbox for tool execution.
-        // Uses SANDBOX_URL env var if set, otherwise auto-starts local_sandbox.py.
+        // sandbox_url — optional external sandbox endpoint for integrations that
+        // need one. Open Paw-specific local sandbox bootstrapping lives in the
+        // openpaw repo now; Temper only seeds an endpoint when configured.
         // determinism-ok: env var read at startup for configuration
         {
             let sandbox_url = if let Ok(url) = std::env::var("SANDBOX_URL") {
                 println!("  Sandbox: {url} (from SANDBOX_URL)");
                 url
             } else {
-                let sandbox_port = port + 10; // e.g., 3000 → 3010
-                let sandbox_url = format!("http://127.0.0.1:{sandbox_port}");
-
-                // Find the local sandbox script relative to the binary or os-apps.
-                let sandbox_script =
-                    std::path::Path::new("os-apps/temper-agent/sandbox/local_sandbox.py");
-                if sandbox_script.exists() {
-                    // Use /tmp/temper-sandbox as the base; create /workspace for tool_runner
-                    // which sends cwd="/workspace" by default (matching E2B's layout).
-                    let _ = std::fs::create_dir_all("/tmp/temper-sandbox");
-                    let _ = std::fs::create_dir_all("/workspace");
-
-                    // determinism-ok: subprocess spawn at startup for local dev sandbox
-                    match std::process::Command::new("python3")
-                        .arg(sandbox_script)
-                        .arg("--port")
-                        .arg(sandbox_port.to_string())
-                        .arg("--workdir")
-                        .arg("/tmp/temper-sandbox")
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .spawn()
-                    {
-                        Ok(_child) => {
-                            println!("  Local sandbox: {sandbox_url} (auto-started)");
-                        }
-                        Err(e) => {
-                            eprintln!("  Warning: failed to start local sandbox: {e}");
-                            eprintln!(
-                                "  Run manually: python3 {sandbox_script:?} --port {sandbox_port}"
-                            );
-                        }
-                    }
-                } else {
-                    eprintln!("  Warning: local sandbox script not found at {sandbox_script:?}");
-                    eprintln!(
-                        "  Set SANDBOX_URL env var or ensure os-apps/temper-agent/sandbox/local_sandbox.py exists"
-                    );
-                }
-
+                let sandbox_url = format!("http://127.0.0.1:{}", port + 10);
+                eprintln!(
+                    "  Warning: SANDBOX_URL not set; Temper no longer auto-starts the Open Paw local sandbox"
+                );
                 sandbox_url
             };
 
@@ -276,35 +240,6 @@ pub async fn run(
     spawn_optimization_loop(&state);
     spawn_actor_passivation_loop(&state);
     state.server.spawn_runtime_metrics_loop();
-
-    // Channel transports: spawn persistent connections to external messaging platforms.
-    // Resolve Discord bot token: CLI/env → vault fallback.
-    let discord_token_resolved = discord_bot_token.or_else(|| {
-        state
-            .server
-            .secrets_vault
-            .as_ref()
-            .and_then(|v| v.get_secret(&tenant, "discord_bot_token"))
-    });
-    if let Some(ref token) = discord_token_resolved {
-        // Seed into vault so WASM modules can also access it.
-        if let Some(ref vault) = state.server.secrets_vault {
-            let _ = vault.cache_secret("default", "discord_bot_token", token.clone());
-            if tenant != "default" {
-                let _ = vault.cache_secret(&tenant, "discord_bot_token", token.clone());
-            }
-        }
-        spawn_channel_transport_discord(
-            &state,
-            token.clone(),
-            &tenant,
-            actual_port,
-            state.api_token.clone(),
-        );
-    } else {
-        println!("  Discord transport: not configured");
-        println!("    Set DISCORD_BOT_TOKEN env var or store 'discord_bot_token' in vault");
-    }
 
     println!("Listening on http://0.0.0.0:{actual_port}");
     axum::serve(listener, router)
@@ -517,44 +452,6 @@ fn spawn_observe_ui(api_port: u16) {
             Err(e) => {
                 eprintln!("  Warning: failed to start Observe UI: {e}");
             }
-        }
-    });
-}
-
-/// Spawn the Discord channel transport using the temper-transport crate.
-///
-/// The transport is an OData API client — it bootstraps Channel + AgentRoute
-/// entities on startup, dispatches Channel.ReceiveMessage for inbound messages,
-/// and receives replies via a webhook listener that send_reply WASM calls.
-fn spawn_channel_transport_discord(
-    _state: &PlatformState,
-    bot_token: String,
-    tenant: &str,
-    port: u16,
-    api_key: Option<String>,
-) {
-    use temper_transport::TemperApiConfig;
-    use temper_transport::discord::types::intents;
-    use temper_transport::discord::{DiscordConfig, DiscordTransport};
-
-    let tenant = tenant.to_string();
-    let api_url = format!("http://127.0.0.1:{port}");
-    println!("  Discord channel transport (v2): connecting (tenant={tenant})...");
-    tokio::spawn(async move {
-        // determinism-ok: WebSocket for channel transport
-        let api = temper_transport::TemperApiClient::new(TemperApiConfig {
-            base_url: api_url,
-            tenant,
-            api_key,
-        });
-        let config = DiscordConfig {
-            bot_token,
-            intents: intents::DEFAULT,
-            webhook_port: 0, // Auto-assign
-        };
-        let transport = DiscordTransport::new(config, api);
-        if let Err(e) = transport.run().await {
-            eprintln!("  [discord] Transport fatal error: {e}");
         }
     });
 }
